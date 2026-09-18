@@ -18,6 +18,12 @@ NFS_VOLUME_ENGRAM="${NFS_VOLUME_ENGRAM:-dsv41-exl3-engram}"
 NFS_EXPORT_MODEL="${NFS_EXPORT_MODEL:-dsv41-exl3}"
 NFS_EXPORT_ENGRAM="${NFS_EXPORT_ENGRAM:-dsv41-engram}"
 NFS_DOCKERFILE_DIR="${NFS_DOCKERFILE_DIR:-$SCRIPT_DIR/files/nfs-server}"
+# Host directory mounted at /export in the exporter. Without it /export is the
+# container's own root, which on an overlay2 host the kernel nfsd refuses to
+# export at all ("/export does not support NFS export"); the entrypoint then
+# dies under set -e and the container restart-loops. Harmless on a storage
+# driver whose container root *is* exportable (zfs, btrfs).
+NFS_EXPORT_ROOT="${NFS_EXPORT_ROOT:-$HOME/.cache/dsv41-exl3-nfs-export}"
 HF_EXPORT_ROOT="${HF_EXPORT_ROOT:-$HOME/.cache/huggingface}"
 NFS_OPTS_CLIENT="${NFS_OPTS_CLIENT:-nfsvers=4.2,ro,nconnect=8,rsize=1048576,wsize=1048576,hard,timeo=600}"
 NFS_SHARE="${NFS_SHARE:-1}"
@@ -78,7 +84,7 @@ nfs_rpc_ready() {
 nfs_write_exports() {
     local ctn="$1" clients="$2"
     docker exec -e NFS_CLIENTS="$clients" \
-        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0}" \
+        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0,crossmnt}" \
         "$ctn" bash -lc '
       set -e
       {
@@ -115,11 +121,17 @@ nfs_ensure_server() {
     docker build -q -t "$NFS_IMAGE" "$NFS_DOCKERFILE_DIR" >/dev/null
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
+    mkdir -p "$NFS_EXPORT_ROOT"
+    # crossmnt: the two trees below /export are separate bind mounts, and without
+    # it the worker mounts the export fine and sees an *empty* directory — a
+    # silent wrong answer rather than an error.
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
         --privileged --network host \
+        -v "$NFS_EXPORT_ROOT:/export" \
         -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
         -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
         -e "NFS_CLIENTS=$clients" \
+        -e "NFS_OPTS=${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0,crossmnt}" \
         "$NFS_IMAGE" >/dev/null
     local i
     for i in $(seq 1 20); do
