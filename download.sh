@@ -55,7 +55,16 @@ if [ "${#missing[@]}" -gt 0 ]; then
     mkdir -p "$ENGRAM_DIR"
     inc=()
     for f in "${ENGRAM_FILES[@]}"; do inc+=(--include "$f"); done
+    # The engram shards are ~95 GiB each and the hub refuses a file that large over the
+    # non-Xet path ("too large to be downloaded using the regular download method"), so this
+    # fetch needs Xet even on a host that disables it elsewhere. HF_HUB_DISABLE_XET=1 is a
+    # common workaround for older hf-xet hangs, and it turns this download into an instant
+    # failure *after* the 197 GiB EXL3 fetch has already succeeded. Set ENGRAM_FORCE_XET=0 to
+    # keep the kit's setting and fail early instead.
+    engram_xet_saved="${HF_HUB_DISABLE_XET-__unset__}"
+    if [ "${ENGRAM_FORCE_XET:-1}" = "1" ]; then export HF_HUB_DISABLE_XET=0; fi
     hf_cli download "$HF_ENGRAM_REPO" "${inc[@]}" --local-dir "$ENGRAM_DIR" --max-workers "${HF_MAX_WORKERS:-8}"
+    if [ "$engram_xet_saved" = "__unset__" ]; then unset HF_HUB_DISABLE_XET; else export HF_HUB_DISABLE_XET="$engram_xet_saved"; fi
 fi
 
 have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]' || true)
