@@ -44,6 +44,11 @@ ENGRAM_FILES=(
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"
+    # Required, not optional: the engram file backend reads config.json at load to
+    # work out each table's layer id. Without it every rank dies with
+    # FileNotFoundError: /engram-src/config.json — after the weights are staged
+    # and NCCL is already up.
+    "config.json"
 )
 missing=()
 for f in "${ENGRAM_FILES[@]}"; do

@@ -80,10 +80,18 @@ def prepare(src: Path, dst: Path) -> dict[str, object]:
         "weight_map": keep,
     }
     (dst / "model.safetensors.index.json").write_text(json.dumps(slim, indent=2) + "\n")
+    # Not optional: engram_file_backend reads config.json at load to derive each
+    # table's layer id, so a slim dir without it boots all the way to the first
+    # decoder layer and then kills every rank with FileNotFoundError. Fail here,
+    # where the message can still say which directory to fix.
     cfg = src / "config.json"
-    if cfg.is_file():
-        shutil.copy2(cfg, dst / "config.json")
-        actions["config.json"] = "copy"
+    if not cfg.is_file():
+        raise SystemExit(
+            f"missing {cfg} — fetch it alongside shards 47+48 "
+            "(hf download <repo> --include config.json --local-dir <ENGRAM_DIR>)"
+        )
+    shutil.copy2(cfg, dst / "config.json")
+    actions["config.json"] = "copy"
     return {"dst": str(dst), "tensors": sorted(keep), "files": actions}
 
 
