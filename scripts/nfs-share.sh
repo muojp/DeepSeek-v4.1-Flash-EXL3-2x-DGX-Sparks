@@ -105,6 +105,17 @@ nfs_ensure_server() {
     clients="$(nfs_clients)"
     live="$(nfs_live_container || true)"
 
+    if [ -n "$live" ] && [ "$live" = "$NFS_CONTAINER" ] && nfs_rpc_ready 127.0.0.1; then
+        # Our own exporter: it bind-mounts both trees under /export already, so
+        # there is nothing to publish. Hardlinking into HF_EXPORT_ROOT here would
+        # build a tree that nothing exports.
+        log "NFS already up ($live, ours) — reusing its binds"
+        nfs_write_exports "$live" "$clients"   # the ACL may have changed since it started
+        NFS_REUSE_EXPORT=0
+        NFS_LIVE_CTN="$live"
+        return 0
+    fi
+
     if [ -n "$live" ] && nfs_rpc_ready 127.0.0.1; then
         log "NFS already up ($live) — keeping exporter, publishing EXL3+Engram into it"
         nfs_write_exports "$live" "$clients"
