@@ -1037,6 +1037,11 @@ ARGS=(
     --no-enable-flashinfer-autotune
     --hf-overrides "{\"engram_table_dir\":\"${ENGRAM_MOUNT}\"}"
 )
+# Report prefix-cache hits per request as usage.prompt_tokens_details.cached_tokens. Off by
+# default in vLLM, so a client sees cached=0 however well the cache works; both sibling recipes on
+# this pair pass it, and the review lane meters cached vs fresh prefill from it. Set
+# PROMPT_TOKENS_DETAILS=0 on a base image whose vLLM does not know the flag.
+[ "${PROMPT_TOKENS_DETAILS:-1}" = "1" ] && ARGS+=(--enable-prompt-tokens-details)
 [ "${ENFORCE_EAGER:-1}" = "1" ] && ARGS+=(--enforce-eager)
 [ -n "${QUANTIZATION:-}" ] && [ "${QUANTIZATION}" != "none" ] && ARGS+=(--quantization "${QUANTIZATION}")
 [ -n "${MAX_MODEL_LEN:-}" ] && ARGS+=(--max-model-len "${MAX_MODEL_LEN}")
@@ -1133,6 +1138,11 @@ ARGS=(
     --no-enable-flashinfer-autotune
     --hf-overrides "{\"engram_table_dir\":\"${ENGRAM_MOUNT}\"}"
 )
+# Report prefix-cache hits per request as usage.prompt_tokens_details.cached_tokens. Off by
+# default in vLLM, so a client sees cached=0 however well the cache works; both sibling recipes on
+# this pair pass it, and the review lane meters cached vs fresh prefill from it. Set
+# PROMPT_TOKENS_DETAILS=0 on a base image whose vLLM does not know the flag.
+[ "${PROMPT_TOKENS_DETAILS:-1}" = "1" ] && ARGS+=(--enable-prompt-tokens-details)
 [ "${ENFORCE_EAGER:-1}" = "1" ] && ARGS+=(--enforce-eager)
 [ -n "${QUANTIZATION:-}" ] && [ "${QUANTIZATION}" != "none" ] && ARGS+=(--quantization "${QUANTIZATION}")
 [ -n "${MAX_MODEL_LEN:-}" ] && ARGS+=(--max-model-len "${MAX_MODEL_LEN}")
